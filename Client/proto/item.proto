@@ -1,0 +1,153 @@
+syntax = "proto3";
+option go_package = "grpc-client-test/item";
+package item;
+import "google/protobuf/field_mask.proto";
+
+service ProductService {
+  rpc GetProduct (ProductRequest) returns (ProductResponse);
+  rpc ListProducts (ProductListRequest) returns (ProductListResponse);
+}
+
+message ProductRequest {
+  string id = 1;
+  google.protobuf.FieldMask field_mask = 2;
+}
+
+message ProductResponse {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  int32 price = 4;
+  string manufacturer_id = 5;
+  string category_id = 6;
+  string image = 7;
+  string country_of_origin = 8;
+  ManufacturerResponse manufacturer = 9;
+  CategoryResponse category = 10;
+  string created_at = 11;
+  string updated_at = 12;
+  repeated ReviewResponse reviews = 13;
+}
+
+message ProductListRequest {
+  PaginatedFilterRequest base_request = 1;
+  NestedFilters nested_filters = 2;
+}
+
+message ProductListResponse {
+  repeated ProductResponse products = 1;
+}
+
+message ManufacturerResponse {
+  string id = 1;
+  string name = 2;
+}
+
+message CategoryResponse {
+  string id = 1;
+  string name = 2;
+}
+
+message ReviewResponse {
+  string id = 1;
+  string product_id = 2;
+  string user_id = 3;
+  int32 rating = 4;
+  string text = 5;
+  bool is_visible = 6;
+  string created_at = 7;
+  string updated_at = 8;
+}
+
+message PaginatedFilterRequest {
+  Pagination pagination = 1;
+  repeated OrderBy order_by = 2;
+  Filter filter = 3;
+  google.protobuf.FieldMask field_mask = 4;
+}
+
+message Pagination {
+  int32 skip = 1;
+  int32 limit = 2;
+}
+
+message OrderBy {
+  string field = 1;
+  enum Direction {
+    ASC = 0;
+    DESC = 1;
+  }
+  Direction direction = 2;
+}
+
+message Filter {
+  oneof condition {
+    AndFilter and = 1;
+    OrFilter or = 2;
+    NotFilter not = 3;
+    FieldFilter field = 4;
+  }
+}
+
+message AndFilter {
+  repeated Filter filters = 1;
+}
+
+message OrFilter {
+  repeated Filter filters = 1;
+}
+
+message NotFilter {
+  Filter filter = 1;
+}
+
+
+message FieldFilter {
+  string field = 1;
+  oneof operation {
+    StringOperation string_op = 2;
+    IntOperation int_op = 3;
+    TimestampOperation timestamp_op = 4;
+  }
+}
+
+message StringOperation {
+  oneof type {
+    string eq = 1;
+    string like = 2;
+  }
+}
+
+message IntOperation {
+  oneof type {
+    int32 eq = 1;
+    int32 lt = 2;
+    int32 gt = 3;
+  }
+}
+
+message TimestampOperation {
+  oneof type {
+    string eq = 1; // ISO 8601 formatted timestamp
+    string lt = 2;
+    string gt = 3;
+  }
+}
+
+message NestedFilters {
+  PaginatedFilterRequest review_filter = 1;
+  PaginatedFilterRequest manufacturer_filter = 2;
+  PaginatedFilterRequest category_filter = 3;
+}
+
+// Filter in Relationships -> Can it be modeled? It is also okay not to support it in first iteration
+
+// Relationship to command --> how do you do that? Not all arguments are mapped.
+// /Eg. Command-> Get Distance between two zip codes, Model for custoemr with zipcode field. Relationship on customer called distance from input zipcode and outputs
+// customers {
+//   distance_from(target_zipcode: ...)
+// } 
+// compute_distance(source_zipcode, target_zipcode)
+// Relationship distance_from, customers.zipcode -> compute_distance.source_zipcode
+
+// Fields with arguments, such as computed fields. Eg. model user (first name, last name, full name (takes separator))
