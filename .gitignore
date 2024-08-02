@@ -2,3 +2,4 @@ Server/venv-grpc
 Server/item_pb2_grpc.py
 Server/item_pb2.py
 Server/__pycache__
+Client/item

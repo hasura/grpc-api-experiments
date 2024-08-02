@@ -3,19 +3,24 @@
 
 ## Server Instructions
 
-python3 -m venv venv-grpc
-source venv-grpc/bin/activate
-pip install grpcio grpcio-tools grpcio-reflection sqlalchemy psycopg2-binary
-python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. item.proto
-export DATABASE_URL="postgresql://read_only_user:readonlyuser@35.236.11.122:5432/v3-docs-sample-app"
-python grpc_server.py
+* cd/server
+* python3 -m venv venv-grpc
+* source venv-grpc/bin/activate
+* pip install grpcio grpcio-tools grpcio-reflection sqlalchemy psycopg2-binary
+* python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. item.proto
+* export DATABASE_URL="postgresql://read_only_user:readonlyuser@35.236.11.122:5432/v3-docs-sample-app"
+* python grpc_server.py
 
 ## Client Intstructions
 
+### Using goclient
 
-### Using grpcui
+* cd client
+* protoc --proto_path=. --proto_path=./proto --go_out=. --go-grpc_out=. item.proto
+* go run main.go
 
-Raw Request
+
+### Using grpcurl
 
 ```bash
 
@@ -85,6 +90,6 @@ grpcurl -plaintext -d '{
 }' localhost:50051 item.ProductService/ListProducts
 ```
 
-can also use
+### Using grpcui
 
 grpcui -plaintext localhost:50051
