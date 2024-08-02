@@ -1,10 +1,10 @@
 package main
 
 import (
+	"client/item"
 	"context"
 	"encoding/json"
 	"fmt"
-	"grpc-client-test/item"
 	"log"
 	"strings"
 	"time"
