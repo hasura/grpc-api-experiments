@@ -1,4 +1,4 @@
-module grpc-client-test
+module client
 
 go 1.22.1
 
