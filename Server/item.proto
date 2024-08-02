@@ -138,15 +138,3 @@ message NestedFilters {
   PaginatedFilterRequest manufacturer_filter = 2;
   PaginatedFilterRequest category_filter = 3;
 }
-
-// Filter in Relationships -> Can it be modeled? It is also okay not to support it in first iteration
-
-// Relationship to command --> how do you do that? Not all arguments are mapped.
-// /Eg. Command-> Get Distance between two zip codes, Model for custoemr with zipcode field. Relationship on customer called distance from input zipcode and outputs
-// customers {
-//   distance_from(target_zipcode: ...)
-// } 
-// compute_distance(source_zipcode, target_zipcode)
-// Relationship distance_from, customers.zipcode -> compute_distance.source_zipcode
-
-// Fields with arguments, such as computed fields. Eg. model user (first name, last name, full name (takes separator))
