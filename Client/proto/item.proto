@@ -111,27 +111,29 @@ message FieldFilter {
   }
 }
 
+enum Operator {
+  EQUALS = 0;
+  NOT_EQUALS = 1;
+  LESS_THAN = 2;
+  LESS_THAN_OR_EQUALS = 3;
+  GREATER_THAN = 4;
+  GREATER_THAN_OR_EQUALS = 5;
+  LIKE = 6;
+}
+
 message StringOperation {
-  oneof type {
-    string eq = 1;
-    string like = 2;
-  }
+  Operator operator = 1;
+  string value = 2;
 }
 
 message IntOperation {
-  oneof type {
-    int32 eq = 1;
-    int32 lt = 2;
-    int32 gt = 3;
-  }
+  Operator operator = 1;
+  int32 value = 2;
 }
 
 message TimestampOperation {
-  oneof type {
-    string eq = 1; // ISO 8601 formatted timestamp
-    string lt = 2;
-    string gt = 3;
-  }
+  Operator operator = 1;
+  string value = 2; // ISO 8601 formatted timestamp
 }
 
 message NestedFilters {
