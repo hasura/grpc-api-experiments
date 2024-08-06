@@ -36,7 +36,7 @@ func main() {
 	client := item.NewProductServiceClient(conn)
 
 	// Set up a context with a timeout
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// Build the request
@@ -140,9 +140,8 @@ func buildComplexListProductsRequest() *item.ProductListRequest {
 										Field: "country_of_origin",
 										Operation: &item.FieldFilter_StringOp{
 											StringOp: &item.StringOperation{
-												Type: &item.StringOperation_Eq{
-													Eq: "US",
-												},
+												Operator: item.Operator_EQUALS,
+												Value:    "US",
 											},
 										},
 									},
@@ -154,9 +153,8 @@ func buildComplexListProductsRequest() *item.ProductListRequest {
 										Field: "category.name",
 										Operation: &item.FieldFilter_StringOp{
 											StringOp: &item.StringOperation{
-												Type: &item.StringOperation_Eq{
-													Eq: "T-Shirts",
-												},
+												Operator: item.Operator_EQUALS,
+												Value:    "T-Shirts",
 											},
 										},
 									},
@@ -188,9 +186,8 @@ func buildComplexListProductsRequest() *item.ProductListRequest {
 							Field: "created_at",
 							Operation: &item.FieldFilter_TimestampOp{
 								TimestampOp: &item.TimestampOperation{
-									Type: &item.TimestampOperation_Gt{
-										Gt: "2023-10-15T00:00:00Z",
-									},
+									Operator: item.Operator_GREATER_THAN,
+									Value:    "2023-10-15T00:00:00Z",
 								},
 							},
 						},
