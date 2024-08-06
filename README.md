@@ -16,12 +16,15 @@
 ### Using goclient
 
 * Install the "vscode-proto3" extension for VSCode
+  
 * cd client
 * go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 * go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 * protoc --proto_path=. --proto_path=./proto --go_out=. --go-grpc_out=. item.proto
 * go run main.go
+  
 * Update VScode workspace settings.json
+* Run the "Go: Install/Update Tools" command from the Command Palette and ensure all tools are up to date.
 
     ```json
     {
