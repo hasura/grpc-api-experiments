@@ -24,7 +24,7 @@
 * Update VScode workspace settings.json
 
     ```json
-        {
+    {
         "protoc": {
         "path": "/path/to/protoc",
         "options": [
