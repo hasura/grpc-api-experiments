@@ -137,6 +137,7 @@ class ProductService(item_pb2_grpc.ProductServiceServicer):
 
     @staticmethod
     def apply_filter(query, filter):
+        # This method remains largely the same
         condition = filter.WhichOneof('condition')
         logger.debug(f"Applying filter condition: {condition}")
 
@@ -177,27 +178,11 @@ class ProductService(item_pb2_grpc.ProductServiceServicer):
     def get_field_filter(model, field, field_filter):
         operation = field_filter.WhichOneof('operation')
         if operation == 'string_op':
-            string_op = field_filter.string_op
-            if string_op.HasField('eq'):
-                return getattr(model, field) == string_op.eq
-            elif string_op.HasField('like'):
-                return getattr(model, field).like(f"%{string_op.like}%")
+            return ProductService.apply_string_operation(model, field, field_filter.string_op)
         elif operation == 'int_op':
-            int_op = field_filter.int_op
-            if int_op.HasField('eq'):
-                return getattr(model, field) == int_op.eq
-            elif int_op.HasField('lt'):
-                return getattr(model, field) < int_op.lt
-            elif int_op.HasField('gt'):
-                return getattr(model, field) > int_op.gt
+            return ProductService.apply_int_operation(model, field, field_filter.int_op)
         elif operation == 'timestamp_op':
-            timestamp_op = field_filter.timestamp_op
-            if timestamp_op.HasField('eq'):
-                return getattr(model, field) == timestamp_op.eq
-            elif timestamp_op.HasField('lt'):
-                return getattr(model, field) < timestamp_op.lt
-            elif timestamp_op.HasField('gt'):
-                return getattr(model, field) > timestamp_op.gt
+            return ProductService.apply_timestamp_operation(model, field, field_filter.timestamp_op)
         logger.warning(f"Unknown operation for field {field}: {operation}")
         return True
 
@@ -215,12 +200,61 @@ class ProductService(item_pb2_grpc.ProductServiceServicer):
         return query.order_by(direction(order_field))
 
     @staticmethod
+    def apply_string_operation(model, field, string_op):
+        field_attr = getattr(model, field)
+        if string_op.operator == item_pb2.Operator.EQUALS:
+            return field_attr == string_op.value
+        elif string_op.operator == item_pb2.Operator.NOT_EQUALS:
+            return field_attr != string_op.value
+        elif string_op.operator == item_pb2.Operator.LIKE:
+            return field_attr.like(f"%{string_op.value}%")
+        logger.warning(f"Unsupported string operation: {string_op.operator}")
+        return True
+    
+    @staticmethod
+    def apply_int_operation(model, field, int_op):
+        field_attr = getattr(model, field)
+        if int_op.operator == item_pb2.Operator.EQUALS:
+            return field_attr == int_op.value
+        elif int_op.operator == item_pb2.Operator.NOT_EQUALS:
+            return field_attr != int_op.value
+        elif int_op.operator == item_pb2.Operator.LESS_THAN:
+            return field_attr < int_op.value
+        elif int_op.operator == item_pb2.Operator.LESS_THAN_OR_EQUALS:
+            return field_attr <= int_op.value
+        elif int_op.operator == item_pb2.Operator.GREATER_THAN:
+            return field_attr > int_op.value
+        elif int_op.operator == item_pb2.Operator.GREATER_THAN_OR_EQUALS:
+            return field_attr >= int_op.value
+        logger.warning(f"Unsupported int operation: {int_op.operator}")
+        return True
+    
+    @staticmethod
+    def apply_timestamp_operation(model, field, timestamp_op):
+        field_attr = getattr(model, field)
+        if timestamp_op.operator == item_pb2.Operator.EQUALS:
+            return field_attr == timestamp_op.value
+        elif timestamp_op.operator == item_pb2.Operator.NOT_EQUALS:
+            return field_attr != timestamp_op.value
+        elif timestamp_op.operator == item_pb2.Operator.LESS_THAN:
+            return field_attr < timestamp_op.value
+        elif timestamp_op.operator == item_pb2.Operator.LESS_THAN_OR_EQUALS:
+            return field_attr <= timestamp_op.value
+        elif timestamp_op.operator == item_pb2.Operator.GREATER_THAN:
+            return field_attr > timestamp_op.value
+        elif timestamp_op.operator == item_pb2.Operator.GREATER_THAN_OR_EQUALS:
+            return field_attr >= timestamp_op.value
+        logger.warning(f"Unsupported timestamp operation: {timestamp_op.operator}")
+        return True
+
+
+    @staticmethod
     def apply_nested_filter(nested_responses, nested_filter):
-        filtered_responses = []
-        for response in nested_responses:
-            if ProductService.matches_filter(response, nested_filter.filter):
-                filtered_responses.append(response)
-        
+        filtered_responses = [
+            response for response in nested_responses
+            if ProductService.matches_filter(response, nested_filter.filter)
+        ]
+
         # Sort filtered responses
         for order_by in nested_filter.order_by:
             filtered_responses.sort(
@@ -255,27 +289,53 @@ class ProductService(item_pb2_grpc.ProductServiceServicer):
         field_value = getattr(response, field_filter.field)
         operation = field_filter.WhichOneof('operation')
         if operation == 'string_op':
-            string_op = field_filter.string_op
-            if string_op.HasField('eq'):
-                return field_value == string_op.eq
-            elif string_op.HasField('like'):
-                return string_op.like in field_value
+            return ProductService.matches_string_operation(field_value, field_filter.string_op)
         elif operation == 'int_op':
-            int_op = field_filter.int_op
-            if int_op.HasField('eq'):
-                return field_value == int_op.eq
-            elif int_op.HasField('lt'):
-                return field_value < int_op.lt
-            elif int_op.HasField('gt'):
-                return field_value > int_op.gt
+            return ProductService.matches_int_operation(field_value, field_filter.int_op)
         elif operation == 'timestamp_op':
-            timestamp_op = field_filter.timestamp_op
-            if timestamp_op.HasField('eq'):
-                return field_value == timestamp_op.eq
-            elif timestamp_op.HasField('lt'):
-                return field_value < timestamp_op.lt
-            elif timestamp_op.HasField('gt'):
-                return field_value > timestamp_op.gt
+            return ProductService.matches_timestamp_operation(field_value, field_filter.timestamp_op)
+        return True
+    
+    @staticmethod
+    def matches_int_operation(field_value, int_op):
+        if int_op.operator == item_pb2.Operator.EQUALS:
+            return field_value == int_op.value
+        elif int_op.operator == item_pb2.Operator.NOT_EQUALS:
+            return field_value != int_op.value
+        elif int_op.operator == item_pb2.Operator.LESS_THAN:
+            return field_value < int_op.value
+        elif int_op.operator == item_pb2.Operator.LESS_THAN_OR_EQUALS:
+            return field_value <= int_op.value
+        elif int_op.operator == item_pb2.Operator.GREATER_THAN:
+            return field_value > int_op.value
+        elif int_op.operator == item_pb2.Operator.GREATER_THAN_OR_EQUALS:
+            return field_value >= int_op.value
+        return True
+
+    @staticmethod
+    def matches_timestamp_operation(field_value, timestamp_op):
+        if timestamp_op.operator == item_pb2.Operator.EQUALS:
+            return field_value == timestamp_op.value
+        elif timestamp_op.operator == item_pb2.Operator.NOT_EQUALS:
+            return field_value != timestamp_op.value
+        elif timestamp_op.operator == item_pb2.Operator.LESS_THAN:
+            return field_value < timestamp_op.value
+        elif timestamp_op.operator == item_pb2.Operator.LESS_THAN_OR_EQUALS:
+            return field_value <= timestamp_op.value
+        elif timestamp_op.operator == item_pb2.Operator.GREATER_THAN:
+            return field_value > timestamp_op.value
+        elif timestamp_op.operator == item_pb2.Operator.GREATER_THAN_OR_EQUALS:
+            return field_value >= timestamp_op.value
+        return True
+
+    @staticmethod
+    def matches_string_operation(field_value, string_op):
+        if string_op.operator == item_pb2.Operator.EQUALS:
+            return field_value == string_op.value
+        elif string_op.operator == item_pb2.Operator.NOT_EQUALS:
+            return field_value != string_op.value
+        elif string_op.operator == item_pb2.Operator.LIKE:
+            return string_op.value in field_value
         return True
 
     @staticmethod
