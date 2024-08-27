@@ -60,14 +60,12 @@ class ProductService(item_pb2_grpc.ProductServiceServicer):
                 joinedload(Product.category),
                 joinedload(Product.reviews)
             )
-            logger.debug(f"Initial query created")
 
             # Apply filtering
             if request.where:
                 try:
                     filter_condition = self.apply_filters(request.where)
                     query = query.filter(filter_condition)
-                    logger.debug(f"Filters applied: {request.where}")
                 except Exception as e:
                     logger.error(f"Error applying filters: {e}")
                     logger.error(traceback.format_exc())
@@ -75,9 +73,9 @@ class ProductService(item_pb2_grpc.ProductServiceServicer):
 
             # Apply ordering
             try:
-                for order_by in request.order_by:
-                    direction = desc if order_by.startswith('-') else asc
-                    field = order_by[1:] if order_by.startswith('-') else order_by
+                for order_by_field in request.order_by:
+                    field = order_by_field.field
+                    direction = desc if order_by_field.direction == item_pb2.SortDirection.SORT_DESCENDING else asc
                     if '.' in field:
                         related_name, attr = field.split('.')
                         related_model = getattr(Product, related_name).property.mapper.class_
@@ -89,9 +87,6 @@ class ProductService(item_pb2_grpc.ProductServiceServicer):
                 logger.error(f"Error applying ordering: {e}")
                 logger.error(traceback.format_exc())
                 return self.handle_error(context, f"Error applying ordering: {str(e)}")
-
-            # Print the SQL query
-            logger.debug(f"Generated SQL query: {query.statement.compile(compile_kwargs={'literal_binds': True})}")
 
             # Get total count before pagination
             try:
@@ -125,23 +120,20 @@ class ProductService(item_pb2_grpc.ProductServiceServicer):
                     # Apply nested filters
                     if request.nested_filters:
                         for filter_type, nested_filter in request.nested_filters.items():
-                            logger.debug(f"Applying nested filter: {filter_type}")
                             if filter_type == "REVIEWS":
                                 try:
-                                    original_review_count = len(product_response.reviews)
                                     self.apply_nested_filter(product_response.reviews, nested_filter)
-                                    logger.debug(f"Nested filter applied to reviews: before={original_review_count}, after={len(product_response.reviews)}")
+                                    logger.debug(f"Nested filter applied to reviews for product ID={db_product.id}")
                                 except Exception as e:
-                                    logger.error(f"Error applying nested filter to reviews: {e}")
+                                    logger.error(f"Error applying nested filter to reviews for product ID={db_product.id}: {e}")
                                     logger.error(traceback.format_exc())
 
                     if request.field_mask.paths:
                         try:
-                            logger.debug(f"Applying field mask: {request.field_mask.paths}")
                             self.apply_field_mask(product_response, request.field_mask)
-                            logger.debug(f"Field mask applied successfully")
+                            logger.debug(f"Field mask applied to product ID={db_product.id}")
                         except Exception as e:
-                            logger.error(f"Error applying field mask: {e}")
+                            logger.error(f"Error applying field mask to product ID={db_product.id}: {e}")
                             logger.error(traceback.format_exc())
 
                     response.products.append(product_response)
@@ -257,9 +249,9 @@ class ProductService(item_pb2_grpc.ProductServiceServicer):
             ]
 
             # Sort filtered responses
-            for order_by in nested_filter.order_by:
-                reverse = order_by.startswith('-')
-                field = order_by[1:] if reverse else order_by
+            for order_by_field in nested_filter.order_by:
+                field = order_by_field.field
+                reverse = order_by_field.direction == item_pb2.SortDirection.SORT_DESCENDING
                 filtered_responses.sort(
                     key=lambda x: getattr(x, field, 0),  # Use 0 as default if field doesn't exist
                     reverse=reverse

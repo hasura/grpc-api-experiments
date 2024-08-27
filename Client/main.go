@@ -66,17 +66,22 @@ func nestedFilterTypeToString(nft item.NestedFilterType) string {
 
 func buildSimplifiedListProductsRequest() *item.ProductListRequest {
 	return &item.ProductListRequest{
-		Offset:  1,
-		Limit:   2,
-		OrderBy: []string{"-category.name"}, // "-" prefix for descending order
+		Offset: 1,
+		Limit:  2,
+		OrderBy: []*item.OrderByField{
+			{
+				Field:     "category.name",
+				Direction: item.SortDirection_SORT_DESCENDING,
+			},
+		},
 		Where: map[string]*item.FilterCriteria{
 			"country_of_origin": {
-				Value:    &item.FilterCriteria_StringValue{StringValue: "US"},
 				Operator: item.OperatorType_EQUALS,
+				Value:    &item.FilterCriteria_StringValue{StringValue: "US"},
 			},
 			"category.name": {
-				Value:    &item.FilterCriteria_StringValue{StringValue: "T-Shirts"},
 				Operator: item.OperatorType_EQUALS,
+				Value:    &item.FilterCriteria_StringValue{StringValue: "T-Shirts"},
 			},
 		},
 		FieldMask: &fieldmaskpb.FieldMask{
@@ -84,13 +89,18 @@ func buildSimplifiedListProductsRequest() *item.ProductListRequest {
 		},
 		NestedFilters: map[string]*item.NestedFilter{
 			NestedFilterReviews: {
-				Offset:  0,
-				Limit:   3,
-				OrderBy: []string{"rating"},
+				Offset: 0,
+				Limit:  3,
+				OrderBy: []*item.OrderByField{
+					{
+						Field:     "rating",
+						Direction: item.SortDirection_SORT_DESCENDING,
+					},
+				},
 				Where: map[string]*item.FilterCriteria{
 					"created_at": {
-						Value:    &item.FilterCriteria_StringValue{StringValue: "2023-10-15T00:00:00Z"},
 						Operator: item.OperatorType_GREATER_THAN,
+						Value:    &item.FilterCriteria_StringValue{StringValue: "2023-10-15T00:00:00Z"},
 					},
 				},
 				FieldMask: &fieldmaskpb.FieldMask{
@@ -100,6 +110,25 @@ func buildSimplifiedListProductsRequest() *item.ProductListRequest {
 		},
 	}
 }
+
+// func buildproductrequest() *item.ProductListRequest{
+// 	return &item.ProductListRequest{
+// 		Offset: 1,
+// 		Limit: 2,
+// 		OrderBy: []*item.OrderByField{
+// 			{
+// 				Field: "category.name",
+// 				Direction: item.SortDirection_SORT_DESCENDING,
+// 			},
+// 		},
+// 		Where: map[string]*item.FilterCriteria{
+// 			"country_of_origin": {
+// 				Value: &item.FilterCriteria_StringValue{StringValue: "US"},
+// 				Operator: item.OperatorType_EQUALS,
+// 			}
+// 		},
+// 	}
+// }
 
 func printColorizedResponse(response *item.ProductListResponse) {
 	// Convert proto message to JSON

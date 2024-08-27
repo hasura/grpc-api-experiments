@@ -32,7 +32,7 @@ message ProductResponse {
 message ProductListRequest {
   int32 offset = 1;
   int32 limit = 2;
-  repeated string order_by = 3;
+  repeated OrderByField order_by = 3;
   map<string, FilterCriteria> where = 4;
   google.protobuf.FieldMask field_mask = 5;
   map<string, NestedFilter> nested_filters = 6;  // Changed from NestedFilterType to string
@@ -50,6 +50,17 @@ enum OperatorType {
   NOT_IN = 8;
 }
 
+enum SortDirection {
+  SORT_DIRECTION_UNSPECIFIED = 0;
+  SORT_ASCENDING = 1;
+  SORT_DESCENDING = 2;
+}
+
+message OrderByField {
+  string field = 1;
+  SortDirection direction = 2;
+}
+
 message ProductListResponse {
   repeated ProductResponse products = 1;
   int32 total_count = 2;
@@ -62,19 +73,19 @@ enum NestedFilterType {
 }
 
 message FilterCriteria {
+  OperatorType operator = 1;
   oneof value {
-    string string_value = 1;
-    int32 int_value = 2;
-    bool bool_value = 3;
-    double float_value = 4;
+    string string_value = 2;
+    int32 int_value = 3;
+    bool bool_value = 4;
+    double float_value = 5;
   }
-  OperatorType operator = 5;
 }
 
 message NestedFilter {
   int32 offset = 1;
   int32 limit = 2;
-  repeated string order_by = 3;
+  repeated OrderByField order_by = 3;
   map<string, FilterCriteria> where = 4;
   google.protobuf.FieldMask field_mask = 5;
 }
