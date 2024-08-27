@@ -10,8 +10,8 @@ from sqlalchemy.orm import aliased, Session, joinedload
 from grpc_reflection.v1alpha import reflection
 import os
 import logging
-from google.protobuf import message
-from google.protobuf.internal import containers
+from google.protobuf import field_mask_pb2
+import traceback
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -33,7 +33,7 @@ class ProductService(item_pb2_grpc.ProductServiceServicer):
                 joinedload(Product.category),
                 joinedload(Product.reviews)
             ).filter(Product.id == UUID(request.id)).first()
-            
+
             if db_product is None:
                 logger.warning("Product not found")
                 context.abort(grpc.StatusCode.NOT_FOUND, "Product not found")
@@ -41,7 +41,7 @@ class ProductService(item_pb2_grpc.ProductServiceServicer):
             response = self.product_to_response(db_product)
 
             if request.field_mask.paths:
-                self.mask_response(response, request.field_mask)
+                self.apply_field_mask(response, request.field_mask)
 
             logger.info("GetProduct request processed successfully")
             return response
@@ -60,44 +60,110 @@ class ProductService(item_pb2_grpc.ProductServiceServicer):
                 joinedload(Product.category),
                 joinedload(Product.reviews)
             )
+            logger.debug(f"Initial query created")
 
-            # Apply filtering if any
-            if request.base_request.filter:
-                filter_condition = self.apply_filter(query, request.base_request.filter)
-                query = query.filter(filter_condition)
-            
-            # Apply ordering if any
-            for order_by in request.base_request.order_by:
-                query = self.apply_order_by(query, order_by)
+            # Apply filtering
+            if request.where:
+                try:
+                    filter_condition = self.apply_filters(request.where)
+                    query = query.filter(filter_condition)
+                    logger.debug(f"Filters applied: {request.where}")
+                except Exception as e:
+                    logger.error(f"Error applying filters: {e}")
+                    logger.error(traceback.format_exc())
+                    return self.handle_error(context, f"Error applying filters: {str(e)}")
+
+            # Apply ordering
+            try:
+                for order_by in request.order_by:
+                    direction = desc if order_by.startswith('-') else asc
+                    field = order_by[1:] if order_by.startswith('-') else order_by
+                    if '.' in field:
+                        related_name, attr = field.split('.')
+                        related_model = getattr(Product, related_name).property.mapper.class_
+                        query = query.join(related_model).order_by(direction(getattr(related_model, attr)))
+                    else:
+                        query = query.order_by(direction(getattr(Product, field)))
+                logger.debug(f"Ordering applied: {request.order_by}")
+            except Exception as e:
+                logger.error(f"Error applying ordering: {e}")
+                logger.error(traceback.format_exc())
+                return self.handle_error(context, f"Error applying ordering: {str(e)}")
+
+            # Print the SQL query
+            logger.debug(f"Generated SQL query: {query.statement.compile(compile_kwargs={'literal_binds': True})}")
+
+            # Get total count before pagination
+            try:
+                total_count = query.count()
+                logger.debug(f"Total count before pagination: {total_count}")
+            except Exception as e:
+                logger.error(f"Error getting total count: {e}")
+                logger.error(traceback.format_exc())
+                return self.handle_error(context, f"Error getting total count: {str(e)}")
 
             # Apply pagination
-            pagination = request.base_request.pagination
-            if pagination:
-                query = query.offset(pagination.skip).limit(pagination.limit)
+            query = query.offset(request.offset).limit(request.limit)
+            logger.debug(f"Pagination applied: offset={request.offset}, limit={request.limit}")
 
-            db_products = query.all()
-            logger.debug(f"Number of products found: {len(db_products)}")
+            try:
+                db_products = query.all()
+                logger.debug(f"Number of products fetched after pagination: {len(db_products)}")
+            except Exception as e:
+                logger.error(f"Error fetching products: {e}")
+                logger.error(traceback.format_exc())
+                return self.handle_error(context, f"Error fetching products: {str(e)}")
 
             response = item_pb2.ProductListResponse()
-            for db_product in db_products:
-                product_response = self.product_to_response(db_product)
-                
-                # Apply nested filters
-                if request.nested_filters.HasField('review_filter'):
-                    self.apply_nested_filter(product_response.reviews, request.nested_filters.review_filter)
-                
-                if request.base_request.field_mask.paths:
-                    self.mask_response(product_response, request.base_request.field_mask)
-                
-                response.products.append(product_response)
+            response.total_count = total_count
 
-            logger.info(f"ListProducts request processed successfully. Returning {len(response.products)} products.")
+            for db_product in db_products:
+                try:
+                    product_response = self.product_to_response(db_product)
+                    logger.debug(f"Product converted to response: ID={db_product.id}")
+
+                    # Apply nested filters
+                    if request.nested_filters:
+                        for filter_type, nested_filter in request.nested_filters.items():
+                            logger.debug(f"Applying nested filter: {filter_type}")
+                            if filter_type == "REVIEWS":
+                                try:
+                                    original_review_count = len(product_response.reviews)
+                                    self.apply_nested_filter(product_response.reviews, nested_filter)
+                                    logger.debug(f"Nested filter applied to reviews: before={original_review_count}, after={len(product_response.reviews)}")
+                                except Exception as e:
+                                    logger.error(f"Error applying nested filter to reviews: {e}")
+                                    logger.error(traceback.format_exc())
+
+                    if request.field_mask.paths:
+                        try:
+                            logger.debug(f"Applying field mask: {request.field_mask.paths}")
+                            self.apply_field_mask(product_response, request.field_mask)
+                            logger.debug(f"Field mask applied successfully")
+                        except Exception as e:
+                            logger.error(f"Error applying field mask: {e}")
+                            logger.error(traceback.format_exc())
+
+                    response.products.append(product_response)
+                    logger.debug(f"Product added to response: ID={db_product.id}")
+                except Exception as e:
+                    logger.error(f"Error processing product {db_product.id}: {e}")
+                    logger.error(traceback.format_exc())
+                    # Continue processing other products
+
+            logger.info(f"ListProducts request processed successfully. Returning {len(response.products)} products out of {total_count} total.")
             return response
         except Exception as e:
-            logger.error(f"Error processing ListProducts request: {e}")
-            context.abort(grpc.StatusCode.INTERNAL, f"Internal server error: {str(e)}")
+            logger.error(f"Unexpected error in ListProducts: {e}")
+            logger.error(traceback.format_exc())
+            return self.handle_error(context, f"Unexpected error: {str(e)}")
         finally:
             db.close()
+
+    @staticmethod
+    def handle_error(context, message):
+        logger.error(message)
+        context.abort(grpc.StatusCode.INTERNAL, message)
 
     @staticmethod
     def product_to_response(db_product):
@@ -127,7 +193,7 @@ class ProductService(item_pb2_grpc.ProductServiceServicer):
             review_response.id = str(review.id)
             review_response.product_id = str(review.product_id)
             review_response.user_id = str(review.user_id)
-            review_response.rating = review.rating
+            review_response.rating = review.rating if hasattr(review, 'rating') else 0  # Default to 0 if rating is missing
             review_response.text = review.text
             review_response.is_visible = review.is_visible
             review_response.created_at = str(review.created_at)
@@ -136,221 +202,132 @@ class ProductService(item_pb2_grpc.ProductServiceServicer):
         return response
 
     @staticmethod
-    def apply_filter(query, filter):
-        # This method remains largely the same
-        condition = filter.WhichOneof('condition')
-        logger.debug(f"Applying filter condition: {condition}")
+    def apply_filters(filters):
+        conditions = []
+        for field, filter_criteria in filters.items():
+            condition = ProductService.apply_filter_criteria(field, filter_criteria)
+            conditions.append(condition)
+        return and_(*conditions)
 
-        if condition == 'and':
-            and_filter = getattr(filter, 'and')
-            and_filters = [ProductService.apply_filter(query, subfilter) for subfilter in and_filter.filters]
-            return and_(*and_filters)
-        elif condition == 'or':
-            or_filter = getattr(filter, 'or')
-            or_filters = [ProductService.apply_filter(query, subfilter) for subfilter in or_filter.filters]
-            return or_(*or_filters)
-        elif condition == 'not':
-            not_filter = getattr(filter, 'not')
-            return not_(ProductService.apply_filter(query, not_filter.filter))
-        elif condition == 'field':
-            return ProductService.apply_field_filter(filter.field)
+    
+    @staticmethod
+    def apply_filter_criteria(field, filter_criteria):
+        if '.' in field:
+            related_name, attr = field.split('.')
+            related_model = getattr(Product, related_name).property.mapper.class_
+            subq = select(related_model).where(
+                and_(
+                    getattr(Product, f"{related_name}_id") == related_model.id,
+                    ProductService.create_filter_condition(getattr(related_model, attr), filter_criteria)
+                )
+            ).correlate(Product)
+            return exists(subq)
         else:
-            logger.warning(f"Unknown filter condition: {condition}")
+            return ProductService.create_filter_condition(getattr(Product, field), filter_criteria)
+
+    @staticmethod
+    def create_filter_condition(field_attr, filter_criteria):
+        value = getattr(filter_criteria, filter_criteria.WhichOneof('value'))
+
+        operator_map = {
+            item_pb2.OperatorType.EQUALS: lambda f, v: f == v,
+            item_pb2.OperatorType.NOT_EQUALS: lambda f, v: f != v,
+            item_pb2.OperatorType.GREATER_THAN: lambda f, v: f > v,
+            item_pb2.OperatorType.LESS_THAN: lambda f, v: f < v,
+            item_pb2.OperatorType.GREATER_THAN_OR_EQUALS: lambda f, v: f >= v,
+            item_pb2.OperatorType.LESS_THAN_OR_EQUALS: lambda f, v: f <= v,
+            item_pb2.OperatorType.LIKE: lambda f, v: f.like(f"%{v}%"),
+            item_pb2.OperatorType.IN: lambda f, v: f.in_(v.split(',') if isinstance(v, str) else v),
+            item_pb2.OperatorType.NOT_IN: lambda f, v: ~f.in_(v.split(',') if isinstance(v, str) else v),
+        }
+
+        operation = operator_map.get(filter_criteria.operator)
+        if operation:
+            return operation(field_attr, value)
+        else:
+            logger.warning(f"Unsupported operator: {filter_criteria.operator}")
             return True
 
     @staticmethod
-    def apply_field_filter(field_filter):
-        field_path = field_filter.field.split('.')
-        if len(field_path) > 1:
-            # Nested field
-            related_model = getattr(Product, field_path[0]).property.mapper.class_
-            related_alias = aliased(related_model)
-            return exists().where(
-                and_(
-                    getattr(Product, f"{field_path[0]}_id") == related_alias.id,
-                    ProductService.get_field_filter(related_alias, field_path[1], field_filter)
-                )
-            )
-        else:
-            return ProductService.get_field_filter(Product, field_filter.field, field_filter)
-
-    @staticmethod
-    def get_field_filter(model, field, field_filter):
-        operation = field_filter.WhichOneof('operation')
-        if operation == 'string_op':
-            return ProductService.apply_string_operation(model, field, field_filter.string_op)
-        elif operation == 'int_op':
-            return ProductService.apply_int_operation(model, field, field_filter.int_op)
-        elif operation == 'timestamp_op':
-            return ProductService.apply_timestamp_operation(model, field, field_filter.timestamp_op)
-        logger.warning(f"Unknown operation for field {field}: {operation}")
-        return True
-
-    @staticmethod
-    def apply_order_by(query, order_by):
-        field_path = order_by.field.split('.')
-        if len(field_path) > 1:
-            # Nested ordering
-            related_model = getattr(Product, field_path[0]).property.mapper.class_
-            order_field = getattr(related_model, field_path[1])
-        else:
-            order_field = getattr(Product, order_by.field)
-        
-        direction = asc if order_by.direction == item_pb2.OrderBy.ASC else desc
-        return query.order_by(direction(order_field))
-
-    @staticmethod
-    def apply_string_operation(model, field, string_op):
-        field_attr = getattr(model, field)
-        if string_op.operator == item_pb2.Operator.EQUALS:
-            return field_attr == string_op.value
-        elif string_op.operator == item_pb2.Operator.NOT_EQUALS:
-            return field_attr != string_op.value
-        elif string_op.operator == item_pb2.Operator.LIKE:
-            return field_attr.like(f"%{string_op.value}%")
-        logger.warning(f"Unsupported string operation: {string_op.operator}")
-        return True
-    
-    @staticmethod
-    def apply_int_operation(model, field, int_op):
-        field_attr = getattr(model, field)
-        if int_op.operator == item_pb2.Operator.EQUALS:
-            return field_attr == int_op.value
-        elif int_op.operator == item_pb2.Operator.NOT_EQUALS:
-            return field_attr != int_op.value
-        elif int_op.operator == item_pb2.Operator.LESS_THAN:
-            return field_attr < int_op.value
-        elif int_op.operator == item_pb2.Operator.LESS_THAN_OR_EQUALS:
-            return field_attr <= int_op.value
-        elif int_op.operator == item_pb2.Operator.GREATER_THAN:
-            return field_attr > int_op.value
-        elif int_op.operator == item_pb2.Operator.GREATER_THAN_OR_EQUALS:
-            return field_attr >= int_op.value
-        logger.warning(f"Unsupported int operation: {int_op.operator}")
-        return True
-    
-    @staticmethod
-    def apply_timestamp_operation(model, field, timestamp_op):
-        field_attr = getattr(model, field)
-        if timestamp_op.operator == item_pb2.Operator.EQUALS:
-            return field_attr == timestamp_op.value
-        elif timestamp_op.operator == item_pb2.Operator.NOT_EQUALS:
-            return field_attr != timestamp_op.value
-        elif timestamp_op.operator == item_pb2.Operator.LESS_THAN:
-            return field_attr < timestamp_op.value
-        elif timestamp_op.operator == item_pb2.Operator.LESS_THAN_OR_EQUALS:
-            return field_attr <= timestamp_op.value
-        elif timestamp_op.operator == item_pb2.Operator.GREATER_THAN:
-            return field_attr > timestamp_op.value
-        elif timestamp_op.operator == item_pb2.Operator.GREATER_THAN_OR_EQUALS:
-            return field_attr >= timestamp_op.value
-        logger.warning(f"Unsupported timestamp operation: {timestamp_op.operator}")
-        return True
-
-
-    @staticmethod
     def apply_nested_filter(nested_responses, nested_filter):
-        filtered_responses = [
-            response for response in nested_responses
-            if ProductService.matches_filter(response, nested_filter.filter)
-        ]
+        try:
+            filtered_responses = [
+                response for response in nested_responses
+                if ProductService.matches_filter(response, nested_filter.where)
+            ]
 
-        # Sort filtered responses
-        for order_by in nested_filter.order_by:
-            filtered_responses.sort(
-                key=lambda x: getattr(x, order_by.field),
-                reverse=(order_by.direction == item_pb2.OrderBy.DESC)
-            )
+            # Sort filtered responses
+            for order_by in nested_filter.order_by:
+                reverse = order_by.startswith('-')
+                field = order_by[1:] if reverse else order_by
+                filtered_responses.sort(
+                    key=lambda x: getattr(x, field, 0),  # Use 0 as default if field doesn't exist
+                    reverse=reverse
+                )
+
+            # Apply pagination
+            start = nested_filter.offset
+            end = start + nested_filter.limit if nested_filter.limit > 0 else None
+            del nested_responses[:]
+            nested_responses.extend(filtered_responses[start:end])
+
+            # Apply field mask
+            if nested_filter.field_mask.paths:
+                for response in nested_responses:
+                    ProductService.apply_field_mask(response, nested_filter.field_mask)
+        except Exception as e:
+            logger.error(f"Error in apply_nested_filter: {e}")
+            logger.error(traceback.format_exc())
         
-        # Apply pagination
-        start = nested_filter.pagination.skip
-        end = start + nested_filter.pagination.limit if nested_filter.pagination.limit > 0 else None
-        del nested_responses[:]
-        nested_responses.extend(filtered_responses[start:end])
+    @staticmethod
+    def matches_filter(response, filters):
+        try:
+            for field, filter_criteria in filters.items():
+                field_value = getattr(response, field, None)
+                if field_value is None:
+                    logger.warning(f"Field {field} not found in response")
+                    return False
+                
+                value = getattr(filter_criteria, filter_criteria.WhichOneof('value'))
+                
+                if not ProductService.compare_values(field_value, value, filter_criteria.operator):
+                    return False
+            return True
+        except Exception as e:
+            logger.error(f"Error in matches_filter: {e}")
+            logger.error(traceback.format_exc())
+            return False
 
     @staticmethod
-    def matches_filter(response, filter):
-        condition = filter.WhichOneof('condition')
-        if condition == 'and':
-            and_filter = getattr(filter, 'and')
-            return all(ProductService.matches_filter(response, subfilter) for subfilter in and_filter.filters)
-        elif condition == 'or':
-            or_filter = getattr(filter, 'or')
-            return any(ProductService.matches_filter(response, subfilter) for subfilter in or_filter.filters)
-        elif condition == 'not':
-            not_filter = getattr(filter, 'not')
-            return not ProductService.matches_filter(response, not_filter.filter)
-        elif condition == 'field':
-            return ProductService.matches_field_filter(response, filter.field)
-        return True
+    def compare_values(field_value, filter_value, operator):
+        operator_map = {
+            item_pb2.OperatorType.EQUALS: lambda a, b: a == b,
+            item_pb2.OperatorType.NOT_EQUALS: lambda a, b: a != b,
+            item_pb2.OperatorType.GREATER_THAN: lambda a, b: a > b,
+            item_pb2.OperatorType.LESS_THAN: lambda a, b: a < b,
+            item_pb2.OperatorType.GREATER_THAN_OR_EQUALS: lambda a, b: a >= b,
+            item_pb2.OperatorType.LESS_THAN_OR_EQUALS: lambda a, b: a <= b,
+            item_pb2.OperatorType.LIKE: lambda a, b: b.lower() in str(a).lower(),
+            item_pb2.OperatorType.IN: lambda a, b: a in b.split(',') if isinstance(b, str) else a in b,
+            item_pb2.OperatorType.NOT_IN: lambda a, b: a not in b.split(',') if isinstance(b, str) else a not in b,
+        }
+
+        operation = operator_map.get(operator)
+        if operation:
+            try:
+                return operation(field_value, filter_value)
+            except Exception as e:
+                logger.error(f"Error comparing values {field_value} and {filter_value} with operator {operator}: {e}")
+                return False
+        else:
+            logger.warning(f"Unsupported operator: {operator}")
+            return True
 
     @staticmethod
-    def matches_field_filter(response, field_filter):
-        field_value = getattr(response, field_filter.field)
-        operation = field_filter.WhichOneof('operation')
-        if operation == 'string_op':
-            return ProductService.matches_string_operation(field_value, field_filter.string_op)
-        elif operation == 'int_op':
-            return ProductService.matches_int_operation(field_value, field_filter.int_op)
-        elif operation == 'timestamp_op':
-            return ProductService.matches_timestamp_operation(field_value, field_filter.timestamp_op)
-        return True
-    
-    @staticmethod
-    def matches_int_operation(field_value, int_op):
-        if int_op.operator == item_pb2.Operator.EQUALS:
-            return field_value == int_op.value
-        elif int_op.operator == item_pb2.Operator.NOT_EQUALS:
-            return field_value != int_op.value
-        elif int_op.operator == item_pb2.Operator.LESS_THAN:
-            return field_value < int_op.value
-        elif int_op.operator == item_pb2.Operator.LESS_THAN_OR_EQUALS:
-            return field_value <= int_op.value
-        elif int_op.operator == item_pb2.Operator.GREATER_THAN:
-            return field_value > int_op.value
-        elif int_op.operator == item_pb2.Operator.GREATER_THAN_OR_EQUALS:
-            return field_value >= int_op.value
-        return True
-
-    @staticmethod
-    def matches_timestamp_operation(field_value, timestamp_op):
-        if timestamp_op.operator == item_pb2.Operator.EQUALS:
-            return field_value == timestamp_op.value
-        elif timestamp_op.operator == item_pb2.Operator.NOT_EQUALS:
-            return field_value != timestamp_op.value
-        elif timestamp_op.operator == item_pb2.Operator.LESS_THAN:
-            return field_value < timestamp_op.value
-        elif timestamp_op.operator == item_pb2.Operator.LESS_THAN_OR_EQUALS:
-            return field_value <= timestamp_op.value
-        elif timestamp_op.operator == item_pb2.Operator.GREATER_THAN:
-            return field_value > timestamp_op.value
-        elif timestamp_op.operator == item_pb2.Operator.GREATER_THAN_OR_EQUALS:
-            return field_value >= timestamp_op.value
-        return True
-
-    @staticmethod
-    def matches_string_operation(field_value, string_op):
-        if string_op.operator == item_pb2.Operator.EQUALS:
-            return field_value == string_op.value
-        elif string_op.operator == item_pb2.Operator.NOT_EQUALS:
-            return field_value != string_op.value
-        elif string_op.operator == item_pb2.Operator.LIKE:
-            return string_op.value in field_value
-        return True
-
-    @staticmethod
-    def mask_response(response, field_mask):
-        all_fields = set(field_mask.paths)
-        for field in list(response.DESCRIPTOR.fields_by_name.keys()):
-            if field not in all_fields and not any(f.startswith(f"{field}.") for f in all_fields):
-                response.ClearField(field)
-            elif hasattr(response, field):
-                value = getattr(response, field)
-                if isinstance(value, (list, containers.RepeatedCompositeFieldContainer)):
-                    for item in value:
-                        ProductService.mask_response(item, field_mask)
-                elif isinstance(value, message.Message):
-                    ProductService.mask_response(value, field_mask)
+    def apply_field_mask(response, field_mask):
+        if not isinstance(field_mask, field_mask_pb2.FieldMask):
+            field_mask = field_mask_pb2.FieldMask(paths=field_mask.paths)
+        field_mask.MergeMessage(field_mask, response, response)
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

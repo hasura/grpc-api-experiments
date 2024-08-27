@@ -1,7 +1,6 @@
 package main
 
 import (
-	"client/item"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,6 +13,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
+
+	"client/item"
 )
 
 var (
@@ -22,6 +23,13 @@ var (
 	numberColor = color.New(color.FgHiMagenta).SprintFunc()
 	boolColor   = color.New(color.FgHiRed).SprintFunc()
 	nullColor   = color.New(color.FgHiCyan).SprintFunc()
+)
+
+// Constants for nested filter types
+const (
+	NestedFilterReviews      = "REVIEWS"
+	NestedFilterManufacturer = "MANUFACTURER"
+	NestedFilterCategory     = "CATEGORY"
 )
 
 func main() {
@@ -40,7 +48,7 @@ func main() {
 	defer cancel()
 
 	// Build the request
-	request := buildComplexListProductsRequest()
+	request := buildSimplifiedListProductsRequest()
 
 	// Make the gRPC call
 	response, err := client.ListProducts(ctx, request)
@@ -50,6 +58,47 @@ func main() {
 
 	// Format and print the response
 	printColorizedResponse(response)
+}
+
+func nestedFilterTypeToString(nft item.NestedFilterType) string {
+	return item.NestedFilterType_name[int32(nft)]
+}
+
+func buildSimplifiedListProductsRequest() *item.ProductListRequest {
+	return &item.ProductListRequest{
+		Offset:  1,
+		Limit:   2,
+		OrderBy: []string{"-category.name"}, // "-" prefix for descending order
+		Where: map[string]*item.FilterCriteria{
+			"country_of_origin": {
+				Value:    &item.FilterCriteria_StringValue{StringValue: "US"},
+				Operator: item.OperatorType_EQUALS,
+			},
+			"category.name": {
+				Value:    &item.FilterCriteria_StringValue{StringValue: "T-Shirts"},
+				Operator: item.OperatorType_EQUALS,
+			},
+		},
+		FieldMask: &fieldmaskpb.FieldMask{
+			Paths: []string{"id", "name", "price", "description", "manufacturer.name"},
+		},
+		NestedFilters: map[string]*item.NestedFilter{
+			NestedFilterReviews: {
+				Offset:  0,
+				Limit:   3,
+				OrderBy: []string{"rating"},
+				Where: map[string]*item.FilterCriteria{
+					"created_at": {
+						Value:    &item.FilterCriteria_StringValue{StringValue: "2023-10-15T00:00:00Z"},
+						Operator: item.OperatorType_GREATER_THAN,
+					},
+				},
+				FieldMask: &fieldmaskpb.FieldMask{
+					Paths: []string{"rating", "text"},
+				},
+			},
+		},
+	}
 }
 
 func printColorizedResponse(response *item.ProductListResponse) {
@@ -120,89 +169,5 @@ func printColorizedJSON(data interface{}, indent int) {
 
 	if indent == 0 {
 		fmt.Println()
-	}
-}
-
-func buildComplexListProductsRequest() *item.ProductListRequest {
-	return &item.ProductListRequest{
-		BaseRequest: &item.PaginatedFilterRequest{
-			Pagination: &item.Pagination{
-				Skip:  1,
-				Limit: 5,
-			},
-			Filter: &item.Filter{
-				Condition: &item.Filter_And{
-					And: &item.AndFilter{
-						Filters: []*item.Filter{
-							{
-								Condition: &item.Filter_Field{
-									Field: &item.FieldFilter{
-										Field: "country_of_origin",
-										Operation: &item.FieldFilter_StringOp{
-											StringOp: &item.StringOperation{
-												Operator: item.Operator_EQUALS,
-												Value:    "US",
-											},
-										},
-									},
-								},
-							},
-							{
-								Condition: &item.Filter_Field{
-									Field: &item.FieldFilter{
-										Field: "category.name",
-										Operation: &item.FieldFilter_StringOp{
-											StringOp: &item.StringOperation{
-												Operator: item.Operator_EQUALS,
-												Value:    "T-Shirts",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			OrderBy: []*item.OrderBy{
-				{
-					Field:     "category.name",
-					Direction: item.OrderBy_DESC,
-				},
-			},
-			FieldMask: &fieldmaskpb.FieldMask{
-				Paths: []string{"id", "name", "price", "description", "manufacturer.name"},
-			},
-		},
-		NestedFilters: &item.NestedFilters{
-			ReviewFilter: &item.PaginatedFilterRequest{
-				Pagination: &item.Pagination{
-					Skip:  0,
-					Limit: 3,
-				},
-				Filter: &item.Filter{
-					Condition: &item.Filter_Field{
-						Field: &item.FieldFilter{
-							Field: "created_at",
-							Operation: &item.FieldFilter_TimestampOp{
-								TimestampOp: &item.TimestampOperation{
-									Operator: item.Operator_GREATER_THAN,
-									Value:    "2023-10-15T00:00:00Z",
-								},
-							},
-						},
-					},
-				},
-				OrderBy: []*item.OrderBy{
-					{
-						Field:     "rating",
-						Direction: item.OrderBy_ASC,
-					},
-				},
-				FieldMask: &fieldmaskpb.FieldMask{
-					Paths: []string{"rating", "text"},
-				},
-			},
-		},
 	}
 }
