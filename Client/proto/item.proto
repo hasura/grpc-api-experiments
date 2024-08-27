@@ -30,12 +30,64 @@ message ProductResponse {
 }
 
 message ProductListRequest {
-  PaginatedFilterRequest base_request = 1;
-  NestedFilters nested_filters = 2;
+  int32 offset = 1;
+  int32 limit = 2;
+  repeated OrderByField order_by = 3;
+  map<string, FilterCriteria> where = 4;
+  google.protobuf.FieldMask field_mask = 5;
+  map<string, NestedFilter> nested_filters = 6;  // Changed from NestedFilterType to string
+}
+
+enum OperatorType {
+  EQUALS = 0;
+  NOT_EQUALS = 1;
+  GREATER_THAN = 2;
+  LESS_THAN = 3;
+  GREATER_THAN_OR_EQUALS = 4;
+  LESS_THAN_OR_EQUALS = 5;
+  LIKE = 6;
+  IN = 7;
+  NOT_IN = 8;
+}
+
+enum SortDirection {
+  SORT_DIRECTION_UNSPECIFIED = 0;
+  SORT_ASCENDING = 1;
+  SORT_DESCENDING = 2;
+}
+
+message OrderByField {
+  string field = 1;
+  SortDirection direction = 2;
 }
 
 message ProductListResponse {
   repeated ProductResponse products = 1;
+  int32 total_count = 2;
+}
+
+enum NestedFilterType {
+  REVIEWS = 0;
+  MANUFACTURER = 1;
+  CATEGORY = 2;
+}
+
+message FilterCriteria {
+  OperatorType operator = 1;
+  oneof value {
+    string string_value = 2;
+    int32 int_value = 3;
+    bool bool_value = 4;
+    double float_value = 5;
+  }
+}
+
+message NestedFilter {
+  int32 offset = 1;
+  int32 limit = 2;
+  repeated OrderByField order_by = 3;
+  map<string, FilterCriteria> where = 4;
+  google.protobuf.FieldMask field_mask = 5;
 }
 
 message ManufacturerResponse {
@@ -57,87 +109,4 @@ message ReviewResponse {
   bool is_visible = 6;
   string created_at = 7;
   string updated_at = 8;
-}
-
-message PaginatedFilterRequest {
-  Pagination pagination = 1;
-  repeated OrderBy order_by = 2;
-  Filter filter = 3;
-  google.protobuf.FieldMask field_mask = 4;
-}
-
-message Pagination {
-  int32 skip = 1;
-  int32 limit = 2;
-}
-
-message OrderBy {
-  string field = 1;
-  enum Direction {
-    ASC = 0;
-    DESC = 1;
-  }
-  Direction direction = 2;
-}
-
-message Filter {
-  oneof condition {
-    AndFilter and = 1;
-    OrFilter or = 2;
-    NotFilter not = 3;
-    FieldFilter field = 4;
-  }
-}
-
-message AndFilter {
-  repeated Filter filters = 1;
-}
-
-message OrFilter {
-  repeated Filter filters = 1;
-}
-
-message NotFilter {
-  Filter filter = 1;
-}
-
-
-message FieldFilter {
-  string field = 1;
-  oneof operation {
-    StringOperation string_op = 2;
-    IntOperation int_op = 3;
-    TimestampOperation timestamp_op = 4;
-  }
-}
-
-enum Operator {
-  EQUALS = 0;
-  NOT_EQUALS = 1;
-  LESS_THAN = 2;
-  LESS_THAN_OR_EQUALS = 3;
-  GREATER_THAN = 4;
-  GREATER_THAN_OR_EQUALS = 5;
-  LIKE = 6;
-}
-
-message StringOperation {
-  Operator operator = 1;
-  string value = 2;
-}
-
-message IntOperation {
-  Operator operator = 1;
-  int32 value = 2;
-}
-
-message TimestampOperation {
-  Operator operator = 1;
-  string value = 2; // ISO 8601 formatted timestamp
-}
-
-message NestedFilters {
-  PaginatedFilterRequest review_filter = 1;
-  PaginatedFilterRequest manufacturer_filter = 2;
-  PaginatedFilterRequest category_filter = 3;
 }
