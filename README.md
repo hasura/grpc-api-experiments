@@ -5,6 +5,8 @@
   Your browser does not support the video tag.
 </video>
 
+https://user-images.githubusercontent.com/hasura/grpc-api-experiments/raw/main/ddn_grpc_client_demo.mp4
+
 ## Server Instructions
 
 * cd/server
