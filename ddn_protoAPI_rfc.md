@@ -1,4 +1,4 @@
-# Technical RFC: Proto-based API output of DDN (Alternative to GraphQL and REST)
+# RFC: Proto-based API output of DDN (Alternative to GraphQL and REST)
 
 - [Technical RFC: Proto-based API output of DDN (Alternative to GraphQL and REST)](#technical-rfc-proto-based-api-output-of-ddn-alternative-to-graphql-and-rest)
   - [Introduction](#introduction)
