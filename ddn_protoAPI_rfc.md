@@ -1,5 +1,31 @@
 # Technical RFC: Proto-based API output of DDN (Alternative to GraphQL and REST)
 
+- [Technical RFC: Proto-based API output of DDN (Alternative to GraphQL and REST)](#technical-rfc-proto-based-api-output-of-ddn-alternative-to-graphql-and-rest)
+  - [Introduction](#introduction)
+  - [Comparison of GraphQL and gRPC](#comparison-of-graphql-and-grpc)
+  - [Implementation Strategy](#implementation-strategy)
+  - [Protobuf Characteristics](#protobuf-characteristics)
+  - [API Features](#api-features)
+    - [1. Strong Typing](#1-strong-typing)
+    - [2. Field Masks](#2-field-masks)
+    - [3. Pagination](#3-pagination)
+    - [4. Sorting (Order By)](#4-sorting-order-by)
+    - [5. Boolean Expressions / Filtering](#5-boolean-expressions--filtering)
+    - [6. Nested Filtering](#6-nested-filtering)
+    - [7. Repeated Fields](#7-repeated-fields)
+    - [8. Nested Objects](#8-nested-objects)
+    - [9. Enumerations](#9-enumerations)
+    - [10. Service Definition](#10-service-definition)
+    - [11. Oneof Fields](#11-oneof-fields)
+    - [12. Total Count for Pagination](#12-total-count-for-pagination)
+    - [13. Relationships (Nested and Referenced Objects)](#13-relationships-nested-and-referenced-objects)
+    - [14. Many-to-One Relationships](#14-many-to-one-relationships)
+    - [15. Commands](#15-commands)
+  - [Open Questions](#open-questions)
+    - [API Features (Proto Definition/DDN Metadata)](#api-features-proto-definitionddn-metadata)
+    - [DX Related](#dx-related)
+
+
 ## Introduction
 
 This document outlines the key features of our Protocol Buffers (proto3) based API. Our design leverages the strengths of Protocol Buffers and gRPC while incorporating concepts familiar to GraphQL users. This approach aims to provide a flexible, efficient, and strongly-typed API that supports complex querying capabilities. 
@@ -9,7 +35,7 @@ This document outlines the key features of our Protocol Buffers (proto3) based A
 
 - **Strong Typing**
   - gRPC's type system supports strong typing with a wide range of scalar types, complex message types, enumerations, and more.
-  - Allows for precise data modeling.
+  - Allows for precise data modeling
 
 - **Nested Messages**
   - gRPC allows nested messages.
@@ -397,14 +423,14 @@ message ProductResponse {
 
 ## Open Questions
 
-- API Features (Proto Definition/DDN Metadata)
+### API Features (Proto Definition/DDN Metadata)
   - Filter in Relationships
   - Nested Filtering for Relationships:
   - Relationship to Command (Computed Fields)
   - Fields with Arguments (Computed Fields)
   - What about bi directionality?
   
-- DX Related
+### DX Related
   - How will DDN supply the proto file to the user?  
   - What if the proto changes?  
     - [https://buf.build/product/bsr](https://buf.build/product/bsr)  
