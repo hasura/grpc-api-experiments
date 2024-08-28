@@ -1,7 +1,6 @@
 # grpc-api-experiments
 
-<!--[Watch the DDN gRPC Client Demo](ddn_grpc_client_demo.mp4) -->
-https://github.com/hasura/grpc-api-experiments/raw/main/ddn_grpc_client_demo.mp4
+[Watch the DDN gRPC Client Demo]([ddn_grpc_client_demo.mp4](https://github.com/user-attachments/assets/533296ef-37be-4d3b-8187-f488b6deb3dc))
 
 ## Server Instructions
 
