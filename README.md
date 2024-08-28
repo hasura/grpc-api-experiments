@@ -1,9 +1,6 @@
 # grpc-api-experiments
 
-<video width="600" height="400" controls>
-  <source src="https://user-images.githubusercontent.com/hasura/grpc-api-experiments/raw/main/ddn_grpc_client_demo.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+[Watch the DDN gRPC Client Demo](https://user-images.githubusercontent.com/hasura/grpc-api-experiments/raw/main/ddn_grpc_client_demo.mp4)
 
 ## Server Instructions
 
