@@ -35,7 +35,7 @@ This document outlines the key features of our Protocol Buffers (proto3) based A
 
 - **Strong Typing**
   - gRPC's type system supports strong typing with a wide range of scalar types, complex message types, enumerations, and more.
-  - Allows for precise data modeling.
+  - Allows for precise data modeling
 
 - **Nested Messages**
   - gRPC allows nested messages.
