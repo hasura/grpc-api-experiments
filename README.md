@@ -1,5 +1,9 @@
 # grpc-api-experiments
 
+<video width="600" height="400" controls>
+  <source src="grpc-api-experiments/ddn_grpc_client_demo.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
 
 ## Server Instructions
 
