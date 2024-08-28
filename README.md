@@ -1,6 +1,6 @@
 # grpc-api-experiments
 
-[Watch the DDN gRPC Client Demo](grpc-api-experiments/ddn_grpc_client_demo.mp4)
+[Watch the DDN gRPC Client Demo](ddn_grpc_client_demo.mp4)
 
 ## Server Instructions
 
