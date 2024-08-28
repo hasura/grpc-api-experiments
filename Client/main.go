@@ -118,7 +118,7 @@ func buildSimplifiedListProductsRequest() *item.ProductListRequest {
 // 		OrderBy: []*item.OrderByField{
 // 			{
 // 				Field: "category.name",
-// 				Direction: item.SortDirection_SORT_DESCENDING,
+// 				Direction: item.SortDirection_SORT_ASCENDING,
 // 			},
 // 		},
 // 		Where: map[string]*item.FilterCriteria{
