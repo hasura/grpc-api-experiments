@@ -111,25 +111,6 @@ func buildSimplifiedListProductsRequest() *item.ProductListRequest {
 	}
 }
 
-// func buildproductrequest() *item.ProductListRequest{
-// 	return &item.ProductListRequest{
-// 		Offset: 1,
-// 		Limit: 2,
-// 		OrderBy: []*item.OrderByField{
-// 			{
-// 				Field: "category.name",
-// 				Direction: item.SortDirection_SORT_ASCENDING,
-// 			},
-// 		},
-// 		Where: map[string]*item.FilterCriteria{
-// 			"country_of_origin": {
-// 				Value: &item.FilterCriteria_StringValue{StringValue: "US"},
-// 				Operator: item.OperatorType_EQUALS,
-// 			}
-// 		},
-// 	}
-// }
-
 func printColorizedResponse(response *item.ProductListResponse) {
 	// Convert proto message to JSON
 	marshaler := protojson.MarshalOptions{
