@@ -1,5 +1,7 @@
 # grpc-api-experiments
 
+[Read the RFC to support gRPC on DDN here](https://github.com/hasura/grpc-api-experiments/blob/main/ddn_protoAPI_rfc.md)
+
 [Watch the DDN gRPC Client Demo](https://github.com/user-attachments/assets/533296ef-37be-4d3b-8187-f488b6deb3dc)
 
 ## Server Instructions
