@@ -113,3 +113,6 @@ grpcurl -plaintext -d '{
 ### Using grpcui
 
 grpcui -plaintext localhost:50051
+
+---
+Notes - https://buf.build/product/bsr
